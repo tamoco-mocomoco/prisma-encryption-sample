@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: prisma-encryption-db
+    environment:
+      POSTGRES_USER: prisma
+      POSTGRES_PASSWORD: prisma
+      POSTGRES_DB: prisma_encryption
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prisma -d prisma_encryption"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: prisma-encryption-app
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://prisma:prisma@postgres:5432/prisma_encryption?schema=public
+      - ENCRYPTION_KEY=k1.aesgcm256.zSsD_ZQwCqg97IqVIKIF5RkgHlx_qGF5lOXRkEaasws=
+      - PORT=4000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./prisma:/app/prisma
+      - ./scripts:/app/scripts
+    command: sh -c "npx prisma generate && npx prisma db push --accept-data-loss && npm start"
+
+volumes:
+  postgres_data:
